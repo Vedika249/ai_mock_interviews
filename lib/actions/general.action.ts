@@ -67,8 +67,9 @@ export async function createFeedback(params: CreateFeedbackParams) {
 }
 
 export async function getInterviewById(id: string): Promise<Interview | null> {
-  const interview = await db.collection("interviews").doc(id).get();
+  if (!id) return null;
 
+  const interview = await db.collection("interviews").doc(id).get();
   return interview.data() as Interview | null;
 }
 
@@ -76,6 +77,8 @@ export async function getFeedbackByInterviewId(
   params: GetFeedbackByInterviewIdParams
 ): Promise<Feedback | null> {
   const { interviewId, userId } = params;
+
+  if (!interviewId || !userId) return null;
 
   const querySnapshot = await db
     .collection("feedback")
@@ -95,23 +98,28 @@ export async function getLatestInterviews(
 ): Promise<Interview[] | null> {
   const { userId, limit = 20 } = params;
 
+  if (!userId) return [];
+
   const interviews = await db
     .collection("interviews")
-    .orderBy("createdAt", "desc")
     .where("finalized", "==", true)
-    .where("userId", "!=", userId)
-    .limit(limit)
+    .orderBy("createdAt", "desc")
+    .limit(50)
     .get();
 
-  return interviews.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  })) as Interview[];
+  const filtered = interviews.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() }) as Interview)
+    .filter((interview) => interview.userId !== userId)
+    .slice(0, limit);
+
+  return filtered;
 }
 
 export async function getInterviewsByUserId(
   userId: string
 ): Promise<Interview[] | null> {
+  if (!userId) return [];
+
   const interviews = await db
     .collection("interviews")
     .where("userId", "==", userId)
